@@ -211,6 +211,14 @@ def convert_excel_to_pdf(input_file: str, output_file: str):
         print(f"Error during API request: {e}")
 
 
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({"status": "ok", "message": "Flask app is running"}), 200
+
+
 # Run the Flask app
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
+
+
+
