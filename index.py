@@ -17,6 +17,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 
 
+load_dotenv()
 # Load environment variables
 if os.getenv("RENDER") is None:  # Render automatically sets this variable
     if not load_dotenv():
