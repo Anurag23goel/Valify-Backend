@@ -18,9 +18,9 @@ from reportlab.lib.pagesizes import letter
 
 
 # Load environment variables
-if not load_dotenv():
-    print("Warning: .env file not found. Ensure environment variables are set!")
-
+if os.getenv("RENDER") is None:  # Render automatically sets this variable
+    if not load_dotenv():
+        print("Warning: .env file not found. Ensure environment variables are set!")
 
 # Function to verify Firebase Authentication Token
 def verify_token(id_token):
