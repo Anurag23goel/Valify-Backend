@@ -13,6 +13,11 @@ import base64
 import tempfile
 from firebase_admin import auth
 import os
+import os
+import json
+import firebase_admin
+from firebase_admin import credentials, firestore, storage
+
 
 
 def verify_token(id_token):
@@ -27,9 +32,19 @@ def verify_token(id_token):
 
 # Initialize Firebase
 if not firebase_admin._apps:
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    cred = credentials.Certificate(os.path.join(BASE_DIR, "serviceAccountKey.json"))
+    # Read Firebase credentials from environment variable
+    firebase_credentials = os.getenv("FIREBASE_CREDENTIALS")
+
+    if not firebase_credentials:
+        raise ValueError("Missing FIREBASE_CREDENTIALS environment variable!")
+
+    # Parse the JSON string
+    cred_dict = json.loads(firebase_credentials)
+    cred = credentials.Certificate(cred_dict)
+
+    # Initialize Firebase
     firebase_admin.initialize_app(cred, {"storageBucket": "valify-7e530.appspot.com"})
+
 
 # Initialize Firestore DB
 db = firestore.client()
