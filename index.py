@@ -214,7 +214,8 @@ def convert_excel_to_pdf(input_file: str, output_file: str):
 @app.route('/health', methods=['GET'])
 def health_check():
     # Print env variables
-    
+    print("FIREBASE_CREDENTIALS:", os.getenv("FIREBASE_CREDENTIALS"))
+    print("CONVERT_API_KEY:", os.getenv("CONVERT_API_KEY"))
     print("RENDER:", os.getenv("RENDER"))
      
     return jsonify({"status": "ok", "message": "Flask app is running"}), 200
