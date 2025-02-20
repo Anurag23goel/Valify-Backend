@@ -121,6 +121,7 @@ def generate_excel():
         if not uid or not project_id:
             return jsonify({"error": "uid and project_id are required"}), 400
 
+        # Fetch Firestore data
         doc_ref = db.collection("users").document(uid).collection("projects").document(project_id)
         doc = doc_ref.get()
 
@@ -130,7 +131,8 @@ def generate_excel():
         res = doc.to_dict()
         data = res.get("answers", {})
 
-        workbook = load_workbook(TEMPLATE_PATH, keep_vba=True)
+        # Load Excel template
+        workbook = load_workbook(TEMPLATE_PATH, keep_vba=True)  # Ensure VBA macros are kept
 
         if "Inputs" not in workbook.sheetnames:
             return jsonify({"error": "Excel template is missing 'Inputs' sheet"}), 500
@@ -142,11 +144,22 @@ def generate_excel():
             if value is not None:
                 worksheet[cell_location].value = value
 
+        # Ensure output directory exists
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+        # Generate unique filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_filename = f"final_invoice_{timestamp}.xlsx"
+        output_filename = f"final_invoice_{timestamp}.xls"
         output_path = os.path.join(OUTPUT_DIR, output_filename)
 
+        # Save and close the workbook
         workbook.save(output_path)
+        workbook.close()
+
+        # Ensure file is fully written before sending
+        if not os.path.exists(output_path):
+            return jsonify({"error": "Failed to generate Excel file"}), 500
+
         return send_file(output_path, as_attachment=True)
 
     except Exception as e:
@@ -213,12 +226,7 @@ def convert_excel_to_pdf(input_file: str, output_file: str):
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    # Print env variables
-    print("FIREBASE_CREDENTIALS:", os.getenv("FIREBASE_CREDENTIALS"))
-    print("CONVERT_API_KEY:", os.getenv("CONVERT_API_KEY"))
-    print("RENDER:", os.getenv("RENDER"))
-     
-    return jsonify({"status": "ok", "message": "Flask app is running"}), 200
+   return jsonify({"status": "ok", "message": "Flask app is running"}), 200
 
 
 # Run the Flask app
