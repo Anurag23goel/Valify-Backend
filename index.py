@@ -17,7 +17,6 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 
 
-load_dotenv()
 # Load environment variables
 if os.getenv("RENDER") is None:  # Render automatically sets this variable
     if not load_dotenv():
@@ -214,6 +213,10 @@ def convert_excel_to_pdf(input_file: str, output_file: str):
 
 @app.route('/health', methods=['GET'])
 def health_check():
+    # Print env variables
+    
+    print("RENDER:", os.getenv("RENDER"))
+     
     return jsonify({"status": "ok", "message": "Flask app is running"}), 200
 
 
