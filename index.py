@@ -14,6 +14,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 
 
+
 # Load environment variables
 if os.getenv("RENDER") is None:  # Render automatically sets this variable
     if not load_dotenv():
@@ -106,10 +107,22 @@ def remove_formulas_route():
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as temp_input:
         excel_file.save(temp_input.name)
+        
+        # Define output file paths
         temp_output = temp_input.name.replace(".xlsx", "_no_formulas.xlsx")
+        
+        # Ensure output directory exists
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+        output_filename = f"processed_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        output_path = os.path.join(OUTPUT_DIR, output_filename)
 
+        # Remove formulas and save the processed file
         remove_formulas_from_excel(temp_input.name, temp_output)
-        return send_file(temp_output, as_attachment=True)
+
+        # Move the file to the output directory
+        os.rename(temp_output, output_path)
+
+        return send_file(output_path, as_attachment=True)
 
 
 # Route to generate an Excel file with Firestore data
@@ -150,7 +163,7 @@ def generate_excel():
 
         # Generate unique filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_filename = f"final_invoice_{timestamp}.xlsx"
+        output_filename = f"final_invoice_{timestamp}.xls"
         output_path = os.path.join(OUTPUT_DIR, output_filename)
 
         # Save and close the workbook
@@ -204,22 +217,41 @@ def remove_formulas_from_excel(input_file: str, output_file: str):
 # Function to convert an Excel file to PDF using ConvertAPI
 def convert_excel_to_pdf(input_file: str, output_file: str):
     headers = {"Authorization": f"Bearer {CONVERT_API_KEY}"}
-    files = {"File": open(input_file, "rb")}
-    data = {"StoreFile": "false", "WorksheetActive": "true", "PageOrientation": "landscape"}
+    
+    with open(input_file, "rb") as file:
+        files = {"File": file}
+        data = {
+            "StoreFile": "false",
+            "WorksheetActive": "true",
+            "PageOrientation": "landscape"
+        }
 
-    try:
-        response = requests.post(CONVERT_API_URL, headers=headers, files=files, data=data)
-        response.raise_for_status()
-        response_data = response.json()
-        file_data_base64 = response_data["Files"][0]["FileData"]
-        file_data_bytes = base64.b64decode(file_data_base64)
+        try:
+            response = requests.post(CONVERT_API_URL, headers=headers, files=files, data=data)
+            response.raise_for_status()
+            response_data = response.json()
 
-        with open(output_file, "wb") as pdf_file:
-            pdf_file.write(file_data_bytes)
+            print("Anurag")
 
-        print(f"PDF successfully saved as '{output_file}'")
-    except requests.exceptions.RequestException as e:
-        print(f"Error during API request: {e}")
+            if "Files" not in response_data or not response_data["Files"]:
+                print("Error: No files returned in the response")
+                return False
+
+            file_data_base64 = response_data["Files"][0]["FileData"]
+            file_data_bytes = base64.b64decode(file_data_base64)
+
+            # Ensure output directory exists
+            os.makedirs(os.path.dirname(output_file), exist_ok=True)
+
+            with open(output_file, "wb") as pdf_file:
+                pdf_file.write(file_data_bytes)
+
+            print(f"PDF successfully saved as '{output_file}'")
+            return True
+
+        except requests.exceptions.RequestException as e:
+            print(f"Error during API request: {e}")
+            return False
 
 
 @app.route('/health', methods=['GET'])
