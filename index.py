@@ -4,13 +4,10 @@ import tempfile
 import requests
 import base64
 from datetime import datetime
-
 import firebase_admin
 from firebase_admin import credentials, firestore, storage, auth
-
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
-
 from dotenv import load_dotenv
 from openpyxl import load_workbook
 from reportlab.pdfgen import canvas
@@ -34,7 +31,6 @@ def verify_token(id_token):
     except Exception as e:
         raise Exception(f"Error verifying token: {str(e)}")
 
-
 # Initialize Firebase
 firebase_credentials = os.getenv("FIREBASE_CREDENTIALS")
 
@@ -49,6 +45,11 @@ try:
 except json.JSONDecodeError as e:
     raise ValueError(f"Invalid FIREBASE_CREDENTIALS JSON: {e}")
 
+CONVERT_API_KEY = os.getenv("CONVERT_API_KEY")
+CONVERT_API_URL = "https://v2.convertapi.com/convert/xls/to/pdf"
+
+if not CONVERT_API_KEY:
+    raise ValueError("Missing CONVERT_API_KEY in environment variables!")
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -166,21 +167,6 @@ def generate_excel():
         return jsonify({"error": str(e)}), 500
 
 
-# Function to remove formulas from an Excel file
-def remove_formulas_from_excel(input_file: str, output_file: str):
-    wb = load_workbook(input_file, data_only=True)
-
-    for sheet in wb.worksheets:
-        for row in sheet.iter_rows():
-            for cell in row:
-                if cell.data_type == 'f':  
-                    cell.value = cell.value  
-                    cell.data_type = 'n'  
-
-    wb.save(output_file)
-    print(f"Processed file saved as: {output_file}")
-
-
 # Route to convert an Excel file to PDF
 @app.route('/convert-to-pdf', methods=['POST'])
 def convert_to_pdf_route():
@@ -197,13 +183,25 @@ def convert_to_pdf_route():
         return send_file(temp_output, as_attachment=True)
 
 
+# Function to remove formulas from an Excel file
+def remove_formulas_from_excel(input_file: str, output_file: str):
+    wb = load_workbook(input_file, data_only=True)  # Load with computed values
+    new_wb = load_workbook(input_file)  # Load without data_only to retain structure
+
+    for sheet_name in wb.sheetnames:
+        source_sheet = wb[sheet_name]  # Sheet with computed values
+        target_sheet = new_wb[sheet_name]  # Sheet with formulas
+
+        for row_idx, row in enumerate(source_sheet.iter_rows(), start=1):
+            for col_idx, cell in enumerate(row, start=1):
+                target_sheet.cell(row=row_idx, column=col_idx, value=cell.value)  # Copy value, removing formula
+
+    new_wb.save(output_file)
+    print(f"Processed file saved as: {output_file}")
+
+
+
 # Function to convert an Excel file to PDF using ConvertAPI
-CONVERT_API_KEY = os.getenv("CONVERT_API_KEY")
-CONVERT_API_URL = "https://v2.convertapi.com/convert/xls/to/pdf"
-
-if not CONVERT_API_KEY:
-    raise ValueError("Missing CONVERT_API_KEY in environment variables!")
-
 def convert_excel_to_pdf(input_file: str, output_file: str):
     headers = {"Authorization": f"Bearer {CONVERT_API_KEY}"}
     files = {"File": open(input_file, "rb")}
@@ -227,7 +225,6 @@ def convert_excel_to_pdf(input_file: str, output_file: str):
 @app.route('/health', methods=['GET'])
 def health_check():
    return jsonify({"status": "ok", "message": "Flask app is running"}), 200
-
 
 # Run the Flask app
 if __name__ == '__main__':
