@@ -12,7 +12,8 @@ from dotenv import load_dotenv
 from openpyxl import load_workbook
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
-
+import fitz 
+import shutil
 
 
 # Load environment variables
@@ -192,26 +193,24 @@ def convert_to_pdf_route():
         excel_file.save(temp_input.name)
         temp_output = temp_input.name.replace(".xlsx", ".pdf")
 
-        convert_excel_to_pdf(temp_input.name, temp_output)
-        return send_file(temp_output, as_attachment=True)
+        # Convert Excel to Full PDF
+        conversion_success = convert_excel_to_pdf(temp_input.name, temp_output)
+        if not conversion_success:
+            return jsonify({"error": "Failed to convert Excel to PDF"}), 500
 
+        # Extract pages from 104 onward
+        extracted_pdf_output = temp_output.replace(".pdf", "_report.pdf")
+        extraction_success = extract_pages_from_pdf(temp_output, extracted_pdf_output, start_page=104)
 
-# Function to remove formulas from an Excel file
-def remove_formulas_from_excel(input_file: str, output_file: str):
-    wb = load_workbook(input_file, data_only=True)  # Load with computed values
-    new_wb = load_workbook(input_file)  # Load without data_only to retain structure
+        if not extraction_success:
+            return jsonify({"error": "Failed to extract report pages from PDF"}), 500
 
-    for sheet_name in wb.sheetnames:
-        source_sheet = wb[sheet_name]  # Sheet with computed values
-        target_sheet = new_wb[sheet_name]  # Sheet with formulas
+        # Store in output directory
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+        output_path = os.path.join(OUTPUT_DIR, os.path.basename(extracted_pdf_output))
+        shutil.move(extracted_pdf_output, output_path)
 
-        for row_idx, row in enumerate(source_sheet.iter_rows(), start=1):
-            for col_idx, cell in enumerate(row, start=1):
-                target_sheet.cell(row=row_idx, column=col_idx, value=cell.value)  # Copy value, removing formula
-
-    new_wb.save(output_file)
-    print(f"Processed file saved as: {output_file}")
-
+        return send_file(output_path, as_attachment=True)
 
 
 # Function to convert an Excel file to PDF using ConvertAPI
@@ -230,8 +229,6 @@ def convert_excel_to_pdf(input_file: str, output_file: str):
             response = requests.post(CONVERT_API_URL, headers=headers, files=files, data=data)
             response.raise_for_status()
             response_data = response.json()
-
-            print("Anurag")
 
             if "Files" not in response_data or not response_data["Files"]:
                 print("Error: No files returned in the response")
@@ -252,6 +249,50 @@ def convert_excel_to_pdf(input_file: str, output_file: str):
         except requests.exceptions.RequestException as e:
             print(f"Error during API request: {e}")
             return False
+        
+
+def extract_pages_from_pdf(input_pdf: str, output_pdf: str, start_page: int):
+    """
+    Extracts pages from `start_page` to the end from `input_pdf` and saves it as `output_pdf`.
+    """
+    doc = fitz.open(input_pdf)
+    total_pages = len(doc)
+
+    if start_page > total_pages:
+        print(f"Error: The PDF only has {total_pages} pages, cannot extract from page {start_page}")
+        return False
+
+    new_doc = fitz.open()
+    for page_num in range(start_page - 1, total_pages):  # Convert to 0-based index
+        new_doc.insert_pdf(doc, from_page=page_num, to_page=page_num)
+
+    new_doc.save(output_pdf)
+    new_doc.close()
+    doc.close()
+
+    if os.path.exists(output_pdf):
+        print(f"✅ Extracted report pages saved as '{output_pdf}'")
+        return True
+    else:
+        print(f"❌ Failed to save extracted report pages as '{output_pdf}'")
+        return False
+
+
+# Function to remove formulas from an Excel file
+def remove_formulas_from_excel(input_file: str, output_file: str):
+    wb = load_workbook(input_file, data_only=True)  # Load with computed values
+    new_wb = load_workbook(input_file)  # Load without data_only to retain structure
+
+    for sheet_name in wb.sheetnames:
+        source_sheet = wb[sheet_name]  # Sheet with computed values
+        target_sheet = new_wb[sheet_name]  # Sheet with formulas
+
+        for row_idx, row in enumerate(source_sheet.iter_rows(), start=1):
+            for col_idx, cell in enumerate(row, start=1):
+                target_sheet.cell(row=row_idx, column=col_idx, value=cell.value)  # Copy value, removing formula
+
+    new_wb.save(output_file)
+    print(f"Processed file saved as: {output_file}")
 
 
 @app.route('/health', methods=['GET'])
