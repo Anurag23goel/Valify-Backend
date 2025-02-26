@@ -150,7 +150,7 @@ def generate_excel():
 
         # Generate unique filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_filename = f"final_invoice_{timestamp}.xls"
+        output_filename = f"final_invoice_{timestamp}.xlsx"
         output_path = os.path.join(OUTPUT_DIR, output_filename)
 
         # Save and close the workbook
