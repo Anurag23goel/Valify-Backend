@@ -264,7 +264,7 @@ def convert_excel_to_pdf(excel_file_path: str, output_pdf_path: str):
             }
 
             # Send the request
-            response = requests.post(CONVERT_API_URL, headers=headers, files=files, data=data, timeout=120)
+            response = requests.post(CONVERT_API_URL, headers=headers, files=files, data=data)
             response.raise_for_status()
             response_data = response.json()
 
