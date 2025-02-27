@@ -14,6 +14,10 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 import fitz 
 import shutil
+import warnings
+
+warnings.simplefilter("ignore", UserWarning)
+
 
 
 # Load environment variables
@@ -209,7 +213,7 @@ def generate_excel_file(uid: str, project_id: str) -> str:
         data = res.get("answers", {})
 
         # Load Excel template
-        workbook = load_workbook(TEMPLATE_PATH, keep_vba=True)  # Keep VBA macros
+        workbook = load_workbook(TEMPLATE_PATH, keep_vba=True, data_only=True)
 
         if "Inputs" not in workbook.sheetnames:
             raise Exception("Excel template is missing 'Inputs' sheet")
