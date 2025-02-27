@@ -256,15 +256,14 @@ def convert_excel_to_pdf(excel_file_path: str, output_pdf_path: str):
 
         # Open and read the Excel file
         with open(excel_file_path, "rb") as file:
-            files = {"File": file}
+            files = {"File": (os.path.basename(excel_file_path), file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
             data = {
                 "StoreFile": "false",
                 "WorksheetActive": "true",
                 "PageOrientation": "landscape",
             }
+            response = requests.post(CONVERT_API_URL, headers=headers, files=files, data=data, timeout=120, stream=True)
 
-            # Send the request
-            response = requests.post(CONVERT_API_URL, headers=headers, files=files, data=data)
             response.raise_for_status()
             response_data = response.json()
 
@@ -309,9 +308,14 @@ def extract_pages_from_pdf(input_pdf: str, output_pdf: str, start_page: int):
     for page_num in range(start_page - 1, total_pages):  # Convert to 0-based index
         new_doc.insert_pdf(doc, from_page=page_num, to_page=page_num)
 
-    new_doc.save(output_pdf)
+    # Save to a new file instead of overwriting
+    temp_output_pdf = output_pdf.replace(".pdf", "_temp.pdf")
+    new_doc.save(temp_output_pdf)
     new_doc.close()
     doc.close()
+
+    # Replace old file with new one
+    os.replace(temp_output_pdf, output_pdf)
 
     if os.path.exists(output_pdf):
         print(f"Extracted report pages saved as '{output_pdf}'")
