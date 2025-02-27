@@ -254,6 +254,7 @@ def convert_excel_to_pdf(excel_file_path: str, output_pdf_path: str):
     try:
         headers = {"Authorization": f"Bearer {CONVERT_API_KEY}"}
 
+        # Open and read the Excel file
         with open(excel_file_path, "rb") as file:
             files = {"File": file}
             data = {
@@ -262,7 +263,8 @@ def convert_excel_to_pdf(excel_file_path: str, output_pdf_path: str):
                 "PageOrientation": "landscape",
             }
 
-            response = requests.post(CONVERT_API_URL, headers=headers, files=files, data=data)
+            # Send the request
+            response = requests.post(CONVERT_API_URL, headers=headers, files=files, data=data, timeout=120)
             response.raise_for_status()
             response_data = response.json()
 
@@ -281,11 +283,15 @@ def convert_excel_to_pdf(excel_file_path: str, output_pdf_path: str):
             print(f"PDF successfully saved as '{output_pdf_path}'")
             return output_pdf_path
 
-    except requests.exceptions.RequestException as e:
+    except requests.Timeout:
+        raise RuntimeError("The request to ConvertAPI timed out. Try reducing the file size.")
+
+    except requests.RequestException as e:
         raise RuntimeError(f"Error during API request: {e}")
 
     except Exception as e:
         raise RuntimeError(f"Error in PDF conversion: {str(e)}")
+
         
 
 def extract_pages_from_pdf(input_pdf: str, output_pdf: str, start_page: int):
