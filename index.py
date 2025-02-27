@@ -304,10 +304,10 @@ def extract_pages_from_pdf(input_pdf: str, output_pdf: str, start_page: int):
     doc.close()
 
     if os.path.exists(output_pdf):
-        print(f"✅ Extracted report pages saved as '{output_pdf}'")
+        print(f"Extracted report pages saved as '{output_pdf}'")
         return True
     else:
-        print(f"❌ Failed to save extracted report pages as '{output_pdf}'")
+        print(f"Failed to save extracted report pages as '{output_pdf}'")
         return False
 
 
