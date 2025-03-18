@@ -64,6 +64,7 @@ CORS(app)
 # Define paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_PATH = os.path.join(BASE_DIR, "dynamic_excel.xlsx")  # Ensure this file exists
+TEMPLATE_PATH_HIST = os.path.join(BASE_DIR, "hist_fin.xlsx")  # Ensure this file exists
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -98,6 +99,14 @@ json_to_excel_mapping = {
         "secondaryRegions": "E67",
         "avgAnnualRevenue": "E49",
         "developmentPhase": "E50",
+    }
+}
+
+json_to_excel_mapping_currency = {
+    "Hist.Fin": {
+        "valuationDate": "D7",
+        "informationCurrency": "D8",
+        "units": "D9"
     }
 }
 
@@ -143,6 +152,24 @@ def generate_excel():
 
         # Call the function that generates Excel
         output_path = generate_excel_file(uid, project_id)
+
+        return send_file(output_path, as_attachment=True)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+@app.route('/generate-excel-hist', methods=['GET'])
+def generate_excel_hist():
+    """Flask route to generate an Excel file and return it as a response"""
+    try:
+        uid = request.args.get('uid')
+        project_id = request.args.get('project_id')
+
+        if not uid or not project_id:
+            return jsonify({"error": "uid and project_id are required"}), 400
+
+        # Call the function that generates Excel
+        output_path = generate_excel_file_hist(uid, project_id)
 
         return send_file(output_path, as_attachment=True)
 
@@ -221,6 +248,57 @@ def generate_excel_file(uid: str, project_id: str) -> str:
         worksheet = workbook["Inputs"]
 
         for field, cell_location in json_to_excel_mapping["Inputs"].items():
+            value = data.get(field, None)
+            if value is not None:
+                worksheet[cell_location].value = value
+
+        # Ensure output directory exists
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+        # Generate unique filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_filename = f"final_invoice_{timestamp}.xlsx"
+        output_path = os.path.join(OUTPUT_DIR, output_filename)
+
+        # Save and close the workbook
+        workbook.save(output_path)
+        workbook.close()
+
+        # Ensure file exists before returning the path
+        if not os.path.exists(output_path):
+            raise Exception("Failed to generate Excel file")
+
+        return output_path  # Return the file path
+
+    except Exception as e:
+        raise RuntimeError(f"Error generating Excel: {str(e)}")
+    
+# Function to generate excel file for historical template
+def generate_excel_file_hist(uid: str, project_id: str) -> str:
+    """Generates an Excel file with Firestore data and returns the file path"""
+    try:
+        if not uid or not project_id:
+            raise ValueError("uid and project_id are required")
+
+        # Fetch Firestore data
+        doc_ref = db.collection("users").document(uid).collection("projects").document(project_id)
+        doc = doc_ref.get()
+
+        if not doc.exists:
+            raise FileNotFoundError("Document not found")
+
+        res = doc.to_dict()
+        data = res.get("answers", {})
+
+        # Load Excel template
+        workbook = load_workbook(TEMPLATE_PATH_HIST, keep_vba=True, data_only=True)
+
+        if "Inputs" not in workbook.sheetnames:
+            raise Exception("Excel template is missing 'Inputs' sheet")
+
+        worksheet = workbook["Inputs"]
+
+        for field, cell_location in json_to_excel_mapping_currency["Inputs"].items():
             value = data.get(field, None)
             if value is not None:
                 worksheet[cell_location].value = value
